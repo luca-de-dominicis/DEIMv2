@@ -48,6 +48,16 @@ COLORS = plt.cm.tab20.colors
 COLOR_MAP = {label: tuple([int(c * 255) for c in COLORS[i % len(COLORS)]]) for i, label in enumerate(label_map)}
 
 
+def resize_with_aspect_ratio(im_pil, size):
+    """Resize image to fit within (h, w) while preserving aspect ratio."""
+    target_h, target_w = size
+    orig_w, orig_h = im_pil.size
+    ratio = min(target_w / orig_w, target_h / orig_h)
+    new_w = int(orig_w * ratio)
+    new_h = int(orig_h * ratio)
+    return im_pil.resize((new_w, new_h), Image.BILINEAR)
+
+
 
 def draw(image, labels, boxes, scores, thrh=0.45):
     draw = ImageDraw.Draw(image)
@@ -79,7 +89,6 @@ def process_dataset(model, dataset_path, output_path, thrh=0.5, size=(640, 640),
     image_paths = [os.path.join(dataset_path, f) for f in os.listdir(dataset_path) if f.endswith(('.jpg', '.png'))]
 
     transforms = T.Compose([
-        T.Resize(size),
         T.ToTensor(),
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
                 if vit_backbone else T.Lambda(lambda x: x)
@@ -92,7 +101,8 @@ def process_dataset(model, dataset_path, output_path, thrh=0.5, size=(640, 640),
         orig_size = torch.tensor([[w, h]]).cuda()
 
         # 图像预处理
-        im_data = transforms(im_pil).unsqueeze(0).cuda()
+        resized_im = resize_with_aspect_ratio(im_pil, size)
+        im_data = transforms(resized_im).unsqueeze(0).cuda()
         output = model(im_data, orig_size)
         labels, boxes, scores = output[0]['labels'], output[0]['boxes'], output[0]['scores']
 

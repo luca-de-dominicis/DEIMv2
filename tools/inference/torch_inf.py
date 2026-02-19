@@ -36,18 +36,28 @@ def draw(images, labels, boxes, scores, thrh=0.45):
         im.save('torch_results.jpg')
 
 
+def resize_with_aspect_ratio(im_pil, size):
+    """Resize image to fit within (h, w) while preserving aspect ratio."""
+    target_h, target_w = size
+    orig_w, orig_h = im_pil.size
+    ratio = min(target_w / orig_w, target_h / orig_h)
+    new_w = int(orig_w * ratio)
+    new_h = int(orig_h * ratio)
+    return im_pil.resize((new_w, new_h), Image.BILINEAR)
+
+
 def process_image(model, device, file_path, size=(640, 640), vit_backbone=False):
     im_pil = Image.open(file_path).convert('RGB')
     w, h = im_pil.size
     orig_size = torch.tensor([[w, h]]).to(device)
 
+    resized_im = resize_with_aspect_ratio(im_pil, size)
     transforms = T.Compose([
-        T.Resize(size),
         T.ToTensor(),
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
                 if vit_backbone else T.Lambda(lambda x: x)
     ])
-    im_data = transforms(im_pil).unsqueeze(0).to(device)
+    im_data = transforms(resized_im).unsqueeze(0).to(device)
 
     output = model(im_data, orig_size)
     labels, boxes, scores = output
@@ -68,7 +78,6 @@ def process_video(model, device, file_path, size=(640, 640), vit_backbone=False)
     out = cv2.VideoWriter('torch_results.mp4', fourcc, fps, (orig_w, orig_h))
 
     transforms = T.Compose([
-        T.Resize(size),
         T.ToTensor(),
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
                 if vit_backbone else T.Lambda(lambda x: x)
@@ -87,7 +96,8 @@ def process_video(model, device, file_path, size=(640, 640), vit_backbone=False)
         w, h = frame_pil.size
         orig_size = torch.tensor([[w, h]]).to(device)
 
-        im_data = transforms(frame_pil).unsqueeze(0).to(device)
+        resized_frame = resize_with_aspect_ratio(frame_pil, size)
+        im_data = transforms(resized_frame).unsqueeze(0).to(device)
 
         output = model(im_data, orig_size)
         labels, boxes, scores = output
