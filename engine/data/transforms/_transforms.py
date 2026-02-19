@@ -115,6 +115,46 @@ class ConvertBoxes(T.Transform):
 
 
 @register()
+class ResizeWithAspectRatio(T.Transform):
+    """Resize an image (and its bounding boxes) to fit within ``size`` while
+    maintaining the original aspect ratio.
+
+    Unlike ``Resize``, this transform never distorts the image.  The shorter
+    or longer edge is scaled so the result fits within the target dimensions,
+    and the bounding-box coordinates are scaled accordingly.  Use together
+    with ``PadToSize`` to produce a fixed-size output, e.g.:
+
+    .. code-block:: yaml
+
+        - {type: ResizeWithAspectRatio, size: [480, 640]}
+        - {type: PadToSize, size: [480, 640]}
+
+    Args:
+        size (int or list[int]): Target ``[height, width]``.  An int is
+            treated as a square target.
+        interpolation: Resampling filter (default: ``BILINEAR``).
+        antialias (bool): Apply antialiasing (default: ``True``).
+    """
+
+    def __init__(self, size, interpolation=T.InterpolationMode.BILINEAR, antialias=True):
+        super().__init__()
+        self.size = (size, size) if isinstance(size, int) else tuple(size)
+        self.interpolation = interpolation
+        self.antialias = antialias
+
+    def _get_params(self, flat_inputs):
+        orig_h, orig_w = F.get_spatial_size(flat_inputs[0])
+        target_h, target_w = self.size
+        ratio = min(target_h / orig_h, target_w / orig_w)
+        new_h = round(orig_h * ratio)
+        new_w = round(orig_w * ratio)
+        return dict(size=[new_h, new_w])
+
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
+        return F.resize(inpt, params['size'], interpolation=self.interpolation, antialias=self.antialias)
+
+
+@register()
 class ConvertPILImage(T.Transform):
     _transformed_types = (
         PIL.Image.Image,

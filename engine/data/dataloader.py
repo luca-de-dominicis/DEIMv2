@@ -85,11 +85,21 @@ class BaseCollateFunction(object):
 
 
 def generate_scales(base_size, base_size_repeat):
-    scale_repeat = (base_size - int(base_size * 0.75 / 32) * 32) // 32
-    scales = [int(base_size * 0.75 / 32) * 32 + i * 32 for i in range(scale_repeat)]
-    scales += [base_size] * base_size_repeat
-    scales += [int(base_size * 1.25 / 32) * 32 - i * 32 for i in range(scale_repeat)]
-    return scales
+    if isinstance(base_size, (list, tuple)):
+        h, w = base_size
+        ratio = w / h
+        scale_repeat = (h - int(h * 0.75 / 32) * 32) // 32
+        h_scales = [int(h * 0.75 / 32) * 32 + i * 32 for i in range(scale_repeat)]
+        h_scales += [h] * base_size_repeat
+        h_scales += [int(h * 1.25 / 32) * 32 - i * 32 for i in range(scale_repeat)]
+        ratio_over_32 = ratio / 32
+        return [(s, int(round(s * ratio_over_32)) * 32) for s in h_scales]
+    else:
+        scale_repeat = (base_size - int(base_size * 0.75 / 32) * 32) // 32
+        scales = [int(base_size * 0.75 / 32) * 32 + i * 32 for i in range(scale_repeat)]
+        scales += [base_size] * base_size_repeat
+        scales += [int(base_size * 1.25 / 32) * 32 - i * 32 for i in range(scale_repeat)]
+        return scales
 
 
 @register() 
@@ -338,8 +348,8 @@ class BatchImageCollateFunction(BaseCollateFunction):
                     draw = ImageDraw.Draw(pilImage)
                     print('mix_vis:', i, 'boxes.len=', len(updated_targets[i]['boxes']))
                     for box in updated_targets[i]['boxes']:
-                        draw.rectangle([int(box[0]*640 - (box[2]*640)/2), int(box[1]*640 - (box[3]*640)/2), 
-                                        int(box[0]*640 + (box[2]*640)/2), int(box[1]*640 + (box[3]*640)/2)], outline=(255,255,0))
+                        draw.rectangle([int(box[0]*img_width - (box[2]*img_width)/2), int(box[1]*img_height - (box[3]*img_height)/2), 
+                                        int(box[0]*img_width + (box[2]*img_width)/2), int(box[1]*img_height + (box[3]*img_height)/2)], outline=(255,255,0))
                     pilImage.save(self.vis_save + str(i) + "_"+ str(len(updated_targets[i]['boxes'])) +'_out.jpg')
 
         return images, targets
