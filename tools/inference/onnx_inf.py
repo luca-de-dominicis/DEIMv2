@@ -15,17 +15,32 @@ from PIL import Image, ImageDraw
 
 
 def resize_with_aspect_ratio(image, size, interpolation=Image.BILINEAR):
-    """Resizes an image while maintaining aspect ratio and pads it."""
+    """Resizes an image while maintaining aspect ratio and pads it.
+
+    Args:
+        image: PIL image to resize.
+        size: Target size as an ``int`` (square) or a ``(width, height)`` tuple.
+        interpolation: PIL resampling filter.
+
+    Returns:
+        Tuple of (padded_image, ratio, pad_w, pad_h).
+    """
     original_width, original_height = image.size
-    ratio = min(size / original_width, size / original_height)
+    if isinstance(size, (list, tuple)):
+        target_w, target_h = size
+    else:
+        target_w = target_h = size
+    ratio = min(target_w / original_width, target_h / original_height)
     new_width = int(original_width * ratio)
     new_height = int(original_height * ratio)
     image = image.resize((new_width, new_height), interpolation)
 
     # Create a new image with the desired size and paste the resized image onto it
-    new_image = Image.new("RGB", (size, size))
-    new_image.paste(image, ((size - new_width) // 2, (size - new_height) // 2))
-    return new_image, ratio, (size - new_width) // 2, (size - new_height) // 2
+    pad_w = (target_w - new_width) // 2
+    pad_h = (target_h - new_height) // 2
+    new_image = Image.new("RGB", (target_w, target_h))
+    new_image.paste(image, (pad_w, pad_h))
+    return new_image, ratio, pad_w, pad_h
 
 
 def draw(images, labels, boxes, scores, ratios, paddings, thrh=0.4):
@@ -150,7 +165,9 @@ def main(args):
     """Main function."""
     # Load the ONNX model
     sess = ort.InferenceSession(args.onnx)
-    size = sess.get_inputs()[0].shape[2]
+    size_h = sess.get_inputs()[0].shape[2]
+    size_w = sess.get_inputs()[0].shape[3]
+    size = (size_w, size_h)
     print(f"Using device: {ort.get_device()}")
 
     input_path = args.input
